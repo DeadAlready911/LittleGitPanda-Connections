@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f5ef">
+  <title>A Little Connection</title>
+  <style>
+    :root { --ink:#181817; --paper:#f7f5ef; --tile:#e9e7df; --yellow:#f9df6d; --green:#a0c35a; --blue:#b0c4ef; --purple:#ba81c5; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font-family:Arial,Helvetica,sans-serif; min-height:100vh; }
+    main { width:min(94vw,650px); margin:0 auto; padding:22px 0 48px; text-align:center; }
+    h1 { margin:5px 0 4px; font-family:Georgia,serif; font-size:clamp(2rem,7vw,3.1rem); letter-spacing:-.04em; }
+    .subtitle { margin:0 0 20px; font-size:.95rem; }
+    .solved { display:grid; gap:8px; margin-bottom:8px; }
+    .solved-card { min-height:80px; padding:14px 12px; border-radius:7px; display:grid; place-content:center; animation:pop .3s ease-out; }
+    .solved-card strong { font-size:.91rem; text-transform:uppercase; letter-spacing:.06em; }
+    .solved-card span { margin-top:5px; font-size:.83rem; font-weight:700; }
+    .board { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .tile { min-width:0; height:92px; border:0; border-radius:7px; padding:4px; background:var(--tile); color:var(--ink); font:800 clamp(.72rem,3.1vw,1rem)/1 Arial,sans-serif; cursor:pointer; overflow-wrap:anywhere; transition:transform .12s,background .12s,color .12s; }
+    .tile:hover { transform:scale(1.02); }
+    .tile.selected { color:white; background:#5a594f; transform:scale(.96); }
+    .tile:focus-visible,.control:focus-visible { outline:3px solid #2878d0; outline-offset:2px; }
+    .status { min-height:37px; margin:13px 0 4px; font-weight:700; display:grid; place-items:center; }
+    .mistakes { display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:18px; font-size:.9rem; }
+    .dot { width:15px; height:15px; border-radius:50%; background:#5a594f; }
+    .dot.used { background:#d7d5cd; }
+    .controls { display:flex; flex-wrap:wrap; justify-content:center; gap:9px; }
+    .control { border:1.5px solid var(--ink); border-radius:999px; background:transparent; padding:11px 19px; font-weight:700; cursor:pointer; }
+    .control.primary { color:white; background:var(--ink); }
+    .control:disabled { opacity:.35; cursor:not-allowed; }
+    .shake { animation:shake .3s; }
+    .modal { position:fixed; inset:0; display:none; place-items:center; padding:20px; background:rgba(247,245,239,.95); z-index:10; }
+    .modal.show { display:grid; animation:fade .5s; }
+    .reveal { width:min(92vw,620px); padding:28px 20px 32px; }
+    .car { font-size:clamp(3rem,14vw,6rem); animation:drive 1.2s ease-in-out both; }
+    .tease { margin:8px 0; font-size:clamp(1.35rem,5vw,2rem); font-weight:800; }
+    .nope { opacity:0; animation:appear .5s 1.2s forwards; font:italic 1.2rem Georgia,serif; }
+    .announcement { opacity:0; margin:18px 0 7px; animation:reveal .7s 2s cubic-bezier(.2,.8,.2,1) forwards; }
+    .house { display:block; font-size:clamp(4rem,18vw,8rem); }
+    .announcement h2 { margin:4px 0; font-family:Georgia,serif; font-size:clamp(2rem,8vw,3.8rem); line-height:.96; }
+    .announcement p { font-size:1.05rem; }
+    .play-again { opacity:0; animation:appear .5s 2.8s forwards; }
+    .confetti { position:fixed; top:-15px; width:10px; height:18px; pointer-events:none; z-index:20; animation:fall 3.5s linear forwards; }
+    @keyframes pop { from { transform:scale(.75); opacity:0; } }
+    @keyframes shake { 25%{transform:translateX(-7px)} 50%{transform:translateX(7px)} 75%{transform:translateX(-4px)} }
+    @keyframes fade { from{opacity:0} }
+    @keyframes drive { from{transform:translateX(-70vw)} to{transform:translateX(0)} }
+    @keyframes appear { to{opacity:1} }
+    @keyframes reveal { from{opacity:0;transform:scale(.4) rotate(-4deg)} to{opacity:1;transform:scale(1) rotate(0)} }
+    @keyframes fall { to{transform:translate3d(var(--drift),105vh,0) rotate(800deg)} }
+    @media (max-width:480px) { main{padding-top:13px}.tile{height:76px}.control{padding:10px 15px}.solved-card{min-height:72px} }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;scroll-behavior:auto!important} }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Connections</h1>
+    <p class="subtitle">Create four groups of four!</p>
+    <section id="solved" class="solved" aria-live="polite"></section>
+    <section id="board" class="board" aria-label="Puzzle tiles"></section>
+    <div id="status" class="status" aria-live="assertive"></div>
+    <div class="mistakes"><span>Mistakes remaining:</span><span id="dots"></span></div>
+    <div class="controls">
+      <button id="shuffle" class="control">Shuffle</button>
+      <button id="deselect" class="control" disabled>Deselect All</button>
+      <button id="submit" class="control primary" disabled>Submit</button>
+    </div>
+  </main>
+
+  <section id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reveal-title">
+    <div class="reveal">
+      <div class="car" aria-hidden="true">🚙</div>
+      <p class="tease">Think I bought a car?</p>
+      <p class="nope">Not quite…</p>
+      <div class="announcement">
+        <span class="house" aria-hidden="true">🏠</span>
+        <h2 id="reveal-title">I BOUGHT A HOUSE!</h2>
+        <p>Surprise! After all that moving, this time it’s official.</p>
+      </div>
+      <button id="again" class="control play-again">Play Again</button>
+    </div>
+  </section>
+
+  <script>
+    const groups = [
+      { label:'Ways to Pay', words:['CASH','CARD','CHECK','WIRE'], color:'var(--yellow)' },
+      { label:'___ MATE', words:['HOUSE','ROOM','CLASS','TEAM'], color:'var(--green)' },
+      { label:'___ COMPANY', words:['HOLDING','MOVING','TITLE','TRUST'], color:'var(--blue)' },
+      { label:'Add “S” for a Past-Tense Verb', words:['LID','OLD','POKE','TRUCK'], color:'var(--purple)' }
+    ];
+    const startingWords = ['OLD','TITLE','CARD','ROOM','TRUCK','CASH','TEAM','MOVING','CHECK','HOUSE','POKE','HOLDING','CLASS','WIRE','TRUST','LID'];
+    let remaining, selected, solved, mistakes, locked;
+    const board=document.querySelector('#board'), solvedArea=document.querySelector('#solved'), status=document.querySelector('#status');
+    const submit=document.querySelector('#submit'), deselect=document.querySelector('#deselect'), shuffle=document.querySelector('#shuffle');
+
+    function reset(){
+      remaining=[...startingWords]; selected=[]; solved=[]; mistakes=4; locked=false;
+      solvedArea.innerHTML=''; status.textContent=''; document.querySelector('#modal').classList.remove('show'); render();
+    }
+    function render(){
+      board.innerHTML='';
+      remaining.forEach(word=>{
+        const b=document.createElement('button'); b.className='tile'+(selected.includes(word)?' selected':''); b.textContent=word;
+        b.setAttribute('aria-pressed',selected.includes(word)); b.onclick=()=>toggle(word); board.appendChild(b);
+      });
+      document.querySelector('#dots').innerHTML=Array.from({length:4},(_,i)=>`<span class="dot ${i>=mistakes?'used':''}"></span>`).join('');
+      submit.disabled=selected.length!==4||locked; deselect.disabled=!selected.length||locked; shuffle.disabled=locked;
+    }
+    function toggle(word){
+      if(locked)return;
+      if(selected.includes(word)) selected=selected.filter(w=>w!==word);
+      else if(selected.length<4) selected.push(word);
+      render();
+    }
+    function sameSet(a,b){ return a.length===b.length&&a.every(x=>b.includes(x)); }
+    function message(text){ status.textContent=text; clearTimeout(message.timer); message.timer=setTimeout(()=>status.textContent='',1800); }
+    function submitGuess(){
+      if(selected.length!==4||locked)return;
+      const match=groups.find((g,i)=>!solved.includes(i)&&sameSet(selected,g.words));
+      if(match){
+        const index=groups.indexOf(match); solved.push(index); remaining=remaining.filter(w=>!selected.includes(w)); selected=[];
+        const card=document.createElement('div'); card.className='solved-card'; card.style.background=match.color;
+        card.innerHTML=`<strong>${match.label}</strong><span>${match.words.join(' · ')}</span>`; solvedArea.appendChild(card); render();
+        if(solved.length===4)setTimeout(showReveal,600);
+      } else {
+        const oneAway=groups.some((g,i)=>!solved.includes(i)&&selected.filter(w=>g.words.includes(w)).length===3);
+        mistakes--; board.classList.remove('shake'); void board.offsetWidth; board.classList.add('shake');
+        message(oneAway?'One away…':'Not quite!'); selected=[]; render();
+        if(mistakes===0){ locked=true; revealAll(); }
+      }
+    }
+    function revealAll(){
+      message('Next time! Here are the answers.');
+      groups.forEach((g,i)=>{ if(!solved.includes(i)){ const card=document.createElement('div'); card.className='solved-card'; card.style.background=g.color; card.innerHTML=`<strong>${g.label}</strong><span>${g.words.join(' · ')}</span>`; solvedArea.appendChild(card); }});
+      board.innerHTML=''; setTimeout(showReveal,2400);
+    }
+    function showReveal(){
+      document.querySelector('#modal').classList.add('show');
+      setTimeout(confetti,1950);
+    }
+    function confetti(){
+      const colors=['#f9df6d','#a0c35a','#b0c4ef','#ba81c5','#e95b4b'];
+      for(let i=0;i<90;i++) setTimeout(()=>{ const p=document.createElement('i'); p.className='confetti'; p.style.left=Math.random()*100+'vw'; p.style.background=colors[i%colors.length]; p.style.setProperty('--drift',(Math.random()*180-90)+'px'); p.style.animationDuration=(2.3+Math.random()*2)+'s'; document.body.appendChild(p); setTimeout(()=>p.remove(),4500); },i*14);
+    }
+    submit.onclick=submitGuess;
+    deselect.onclick=()=>{selected=[];render()};
+    shuffle.onclick=()=>{ for(let i=remaining.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];} selected=[];render(); };
+    document.querySelector('#again').onclick=reset;
+    reset();
+  </script>
+</body>
+</html>
