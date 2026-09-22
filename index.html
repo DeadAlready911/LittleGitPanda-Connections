@@ -143,17 +143,20 @@
       const rows=guesses.map(guess=>guess.map(word=>squares[groups.findIndex(g=>g.words.includes(word))]).join(''));
       return `Connections by Bryan\nSolved in ${guesses.length} ${guesses.length===1?'guess':'guesses'}!\n\n${rows.join('\n')}\n\n${window.location.href}`;
     }
+    function legacyCopy(text){
+      const area=document.createElement('textarea');
+      area.value=text; area.setAttribute('readonly',''); area.style.position='fixed'; area.style.opacity='0';
+      document.body.appendChild(area); area.select(); area.setSelectionRange(0,area.value.length);
+      const copied=document.execCommand('copy'); area.remove(); return copied;
+    }
     async function shareResults(){
       const text=shareText(), shareStatus=document.querySelector('#share-status');
-      try {
-        if(navigator.share) await navigator.share({title:'Connections by Bryan',text});
-        else { await navigator.clipboard.writeText(text); shareStatus.textContent='Results copied!'; }
-      } catch(error) {
-        if(error.name!=='AbortError') {
-          try { await navigator.clipboard.writeText(text); shareStatus.textContent='Results copied!'; }
-          catch { shareStatus.textContent='Could not copy automatically.'; }
-        }
-      }
+      let copied=false;
+      try { await navigator.clipboard.writeText(text); copied=true; }
+      catch { copied=legacyCopy(text); }
+      shareStatus.textContent=copied
+        ? 'Full results copied! Paste them into a message or post.'
+        : 'Copy was blocked by your browser. Please try again.';
     }
     submit.onclick=submitGuess;
     deselect.onclick=()=>{selected=[];render()};
