@@ -22,9 +22,7 @@
     .tile.selected { color:white; background:#5a594f; transform:scale(.96); }
     .tile:focus-visible,.control:focus-visible { outline:3px solid #2878d0; outline-offset:2px; }
     .status { min-height:37px; margin:13px 0 4px; font-weight:700; display:grid; place-items:center; }
-    .mistakes { display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:18px; font-size:.9rem; }
-    .dot { width:15px; height:15px; border-radius:50%; background:#5a594f; }
-    .dot.used { background:#d7d5cd; }
+    .mistakes { margin-bottom:18px; font-size:.9rem; font-weight:700; }
     .controls { display:flex; flex-wrap:wrap; justify-content:center; gap:9px; }
     .control { border:1.5px solid var(--ink); border-radius:999px; background:transparent; padding:11px 19px; font-weight:700; cursor:pointer; }
     .control.primary { color:white; background:var(--ink); }
@@ -55,12 +53,12 @@
 </head>
 <body>
   <main>
-    <h1>Connections</h1>
+    <h1>Connections by Bryan</h1>
     <p class="subtitle">Create four groups of four!</p>
     <section id="solved" class="solved" aria-live="polite"></section>
     <section id="board" class="board" aria-label="Puzzle tiles"></section>
     <div id="status" class="status" aria-live="assertive"></div>
-    <div class="mistakes"><span>Mistakes remaining:</span><span id="dots"></span></div>
+    <div class="mistakes">Unlimited Mistakes Remaining</div>
     <div class="controls">
       <button id="shuffle" class="control">Shuffle</button>
       <button id="deselect" class="control" disabled>Deselect All</button>
@@ -76,9 +74,12 @@
       <div class="announcement">
         <span class="house" aria-hidden="true">🏠</span>
         <h2 id="reveal-title">I BOUGHT A HOUSE!</h2>
-        <p>Surprise! After all that moving, this time it’s official.</p>
+        <p>Surprise! After just moving, it's time to do it again!</p>
       </div>
+      <button id="share" class="control primary play-again">Share Results</button>
       <button id="again" class="control play-again">Play Again</button>
+      <p class="play-again"><strong>Please share only your results—don’t ruin the surprise for anyone who is still playing!</strong></p>
+      <p id="share-status" aria-live="polite"></p>
     </div>
   </section>
 
@@ -90,13 +91,13 @@
       { label:'Add “S” for a Past-Tense Verb', words:['LID','OLD','POKE','TRUCK'], color:'var(--purple)' }
     ];
     const startingWords = ['OLD','TITLE','CARD','ROOM','TRUCK','CASH','TEAM','MOVING','CHECK','HOUSE','POKE','HOLDING','CLASS','WIRE','TRUST','LID'];
-    let remaining, selected, solved, mistakes, locked;
+    let remaining, selected, solved, guesses, locked;
     const board=document.querySelector('#board'), solvedArea=document.querySelector('#solved'), status=document.querySelector('#status');
     const submit=document.querySelector('#submit'), deselect=document.querySelector('#deselect'), shuffle=document.querySelector('#shuffle');
 
     function reset(){
-      remaining=[...startingWords]; selected=[]; solved=[]; mistakes=4; locked=false;
-      solvedArea.innerHTML=''; status.textContent=''; document.querySelector('#modal').classList.remove('show'); render();
+      remaining=[...startingWords]; selected=[]; solved=[]; guesses=[]; locked=false;
+      solvedArea.innerHTML=''; status.textContent=''; document.querySelector('#share-status').textContent=''; document.querySelector('#modal').classList.remove('show'); render();
     }
     function render(){
       board.innerHTML='';
@@ -104,7 +105,6 @@
         const b=document.createElement('button'); b.className='tile'+(selected.includes(word)?' selected':''); b.textContent=word;
         b.setAttribute('aria-pressed',selected.includes(word)); b.onclick=()=>toggle(word); board.appendChild(b);
       });
-      document.querySelector('#dots').innerHTML=Array.from({length:4},(_,i)=>`<span class="dot ${i>=mistakes?'used':''}"></span>`).join('');
       submit.disabled=selected.length!==4||locked; deselect.disabled=!selected.length||locked; shuffle.disabled=locked;
     }
     function toggle(word){
@@ -117,6 +117,7 @@
     function message(text){ status.textContent=text; clearTimeout(message.timer); message.timer=setTimeout(()=>status.textContent='',1800); }
     function submitGuess(){
       if(selected.length!==4||locked)return;
+      guesses.push([...selected]);
       const match=groups.find((g,i)=>!solved.includes(i)&&sameSet(selected,g.words));
       if(match){
         const index=groups.indexOf(match); solved.push(index); remaining=remaining.filter(w=>!selected.includes(w)); selected=[];
@@ -125,15 +126,9 @@
         if(solved.length===4)setTimeout(showReveal,600);
       } else {
         const oneAway=groups.some((g,i)=>!solved.includes(i)&&selected.filter(w=>g.words.includes(w)).length===3);
-        mistakes--; board.classList.remove('shake'); void board.offsetWidth; board.classList.add('shake');
+        board.classList.remove('shake'); void board.offsetWidth; board.classList.add('shake');
         message(oneAway?'One away…':'Not quite!'); selected=[]; render();
-        if(mistakes===0){ locked=true; revealAll(); }
       }
-    }
-    function revealAll(){
-      message('Next time! Here are the answers.');
-      groups.forEach((g,i)=>{ if(!solved.includes(i)){ const card=document.createElement('div'); card.className='solved-card'; card.style.background=g.color; card.innerHTML=`<strong>${g.label}</strong><span>${g.words.join(' · ')}</span>`; solvedArea.appendChild(card); }});
-      board.innerHTML=''; setTimeout(showReveal,2400);
     }
     function showReveal(){
       document.querySelector('#modal').classList.add('show');
@@ -143,10 +138,28 @@
       const colors=['#f9df6d','#a0c35a','#b0c4ef','#ba81c5','#e95b4b'];
       for(let i=0;i<90;i++) setTimeout(()=>{ const p=document.createElement('i'); p.className='confetti'; p.style.left=Math.random()*100+'vw'; p.style.background=colors[i%colors.length]; p.style.setProperty('--drift',(Math.random()*180-90)+'px'); p.style.animationDuration=(2.3+Math.random()*2)+'s'; document.body.appendChild(p); setTimeout(()=>p.remove(),4500); },i*14);
     }
+    function shareText(){
+      const squares=['🟨','🟩','🟦','🟪'];
+      const rows=guesses.map(guess=>guess.map(word=>squares[groups.findIndex(g=>g.words.includes(word))]).join(''));
+      return `Connections by Bryan\nSolved in ${guesses.length} ${guesses.length===1?'guess':'guesses'}!\n\n${rows.join('\n')}\n\n${window.location.href}`;
+    }
+    async function shareResults(){
+      const text=shareText(), shareStatus=document.querySelector('#share-status');
+      try {
+        if(navigator.share) await navigator.share({title:'Connections by Bryan',text});
+        else { await navigator.clipboard.writeText(text); shareStatus.textContent='Results copied!'; }
+      } catch(error) {
+        if(error.name!=='AbortError') {
+          try { await navigator.clipboard.writeText(text); shareStatus.textContent='Results copied!'; }
+          catch { shareStatus.textContent='Could not copy automatically.'; }
+        }
+      }
+    }
     submit.onclick=submitGuess;
     deselect.onclick=()=>{selected=[];render()};
     shuffle.onclick=()=>{ for(let i=remaining.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];} selected=[];render(); };
     document.querySelector('#again').onclick=reset;
+    document.querySelector('#share').onclick=shareResults;
     reset();
   </script>
 </body>
