@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f5ef">
+  <meta name="description" content="Can you find the four connections? Play Bryan's custom puzzle.">
+  <meta property="og:title" content="A Little Connection">
+  <meta property="og:description" content="Can you find the four connections? Play Bryan's custom puzzle.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://deadalready911.github.io/LittleGitPanda-Connections/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="A Little Connection">
+  <meta name="twitter:description" content="Can you find the four connections? Play Bryan's custom puzzle.">
   <title>A Little Connection</title>
   <style>
     :root { --ink:#181817; --paper:#f7f5ef; --tile:#e9e7df; --yellow:#f9df6d; --green:#a0c35a; --blue:#b0c4ef; --purple:#ba81c5; }
@@ -73,8 +81,8 @@
       <p class="nope">Not quite…</p>
       <div class="announcement">
         <span class="house" aria-hidden="true">🏠</span>
-        <h2 id="reveal-title">I BOUGHT A HOUSE!</h2>
-        <p>Surprise! After just moving, it's time to do it again!</p>
+        <h2 id="reveal-title"></h2>
+        <p id="reveal-message"></p>
       </div>
       <button id="share" class="control primary play-again">Share Results</button>
       <button id="again" class="control play-again">Play Again</button>
@@ -97,7 +105,9 @@
 
     function reset(){
       remaining=[...startingWords]; selected=[]; solved=[]; guesses=[]; locked=false;
-      solvedArea.innerHTML=''; status.textContent=''; document.querySelector('#share-status').textContent=''; document.querySelector('#modal').classList.remove('show'); render();
+      solvedArea.innerHTML=''; status.textContent=''; document.querySelector('#share-status').textContent='';
+      document.querySelector('#reveal-title').textContent=''; document.querySelector('#reveal-message').textContent='';
+      document.querySelector('#modal').classList.remove('show'); render();
     }
     function render(){
       board.innerHTML='';
@@ -131,6 +141,8 @@
       }
     }
     function showReveal(){
+      document.querySelector('#reveal-title').textContent='I BOUGHT A HOUSE!';
+      document.querySelector('#reveal-message').textContent="Surprise! After just moving, it's time to do it again!";
       document.querySelector('#modal').classList.add('show');
       setTimeout(confetti,1950);
     }
@@ -141,7 +153,8 @@
     function shareText(){
       const squares=['🟨','🟩','🟦','🟪'];
       const rows=guesses.map(guess=>guess.map(word=>squares[groups.findIndex(g=>g.words.includes(word))]).join(''));
-      return `Connections by Bryan\nSolved in ${guesses.length} ${guesses.length===1?'guess':'guesses'}!\n\n${rows.join('\n')}\n\n${window.location.href}`;
+      const shareUrl=new URL(window.location.href); shareUrl.searchParams.set('v','3');
+      return `Connections by Bryan\nSolved in ${guesses.length} ${guesses.length===1?'guess':'guesses'}!\n\n${rows.join('\n')}\n\n${shareUrl.href}`;
     }
     function legacyCopy(text){
       const area=document.createElement('textarea');
